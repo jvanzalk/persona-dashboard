@@ -6,6 +6,8 @@ Leading marketing automation platforms, such as Pardot, do not have built-in vis
 
 This full-stack analytics application leverages the Pardot API as well as Amazon’s RDS and EC2 services, to help companies track their personas’ growth and engagement.
 
+![](https://media.giphy.com/media/lOmuezZPD9sdYpc0NB/giphy.gif)
+
 ## ETL Flow
 1. Jupyter Notebook Server to an Amazon EC2 Instance. Rather than run Jupyter locally, an EC2 instance offers the ability to upgrade computing power and run a script anytime.
 2. Python script that extracts data from Pardot and Salesforce, transforms it, and loads it to a PostgreSQL database. And, that scripts runs on business days at 12 am when my computer is off and I’m asleep.

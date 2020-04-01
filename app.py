@@ -77,7 +77,7 @@ def index():
 
     top_campaigns = top_campaigns.to_dict('records')
 
-    return render_template('test.html', data=data, avg_engage=avg_engage, engage_type=engage_type, recfreq=recfreq, pop_growth=pop_growth, top_campaigns=top_campaigns, top_items=top_items)
+    return render_template('index.html', data=data, avg_engage=avg_engage, engage_type=engage_type, recfreq=recfreq, pop_growth=pop_growth, top_campaigns=top_campaigns, top_items=top_items)
 
 if __name__ == '__main__':
     app.run(debug=True)

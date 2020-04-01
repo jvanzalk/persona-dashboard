@@ -1,0 +1,48 @@
+* {
+    font-family: 'Open Sans', sans-serif;
+}
+table {
+    border-collapse: collapse;
+    margin: auto;
+    width: 95%;
+}
+td {
+    border: 1px solid #ddd;
+    padding: 6px;
+    font-size: 14px;
+}
+th {
+    background-color: #223a6f;
+    color: white;
+    padding: 6px;
+    font-size: 14px;
+}
+tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+tr:hover {
+    background-color: #ddd;
+} 
+.jumbotron{
+    color: #ffffff;
+    background-color:#223a6f;
+    text-align:center;
+} 
+#Persona {
+    background-color:lightgrey;
+}
+select {
+    width: 100px;
+    margin: 20px;
+}
+body {
+    padding-bottom: 20px;
+}
+.navbar-default {
+    background-color: #223a6f;
+    border-color:#223a6f;
+}
+.navbar-default .navbar-brand {
+    color:white;
+}
+

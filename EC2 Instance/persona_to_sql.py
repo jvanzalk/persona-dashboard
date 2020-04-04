@@ -1,21 +1,21 @@
 #!/usr/bin/python3
 
-import pandas as pd
-import numpy as np
-import requests
-import json
-import urllib
-import sqlalchemy
+import pandas as pd #Data manipulation
+import numpy as np #Remove NaNs
+import requests #Send HTTP requests and access response data
+import json #Read JSON formatted date
+import urllib #Fetch URLs
+import sqlalchemy #Connect and  push data to sql db
 from sqlalchemy import create_engine
-import re
-from simple_salesforce import Salesforce
-import datetime
+import re #Extract characters from strings
+from simple_salesforce import Salesforce #Querying Salesfroce
+import datetime #Filtering dataframes by date
 from datetime import datetime, timedelta
 
-#import config files
+#Import config files
 from config import API_User_Key, email, password, sf_username, sf_password, sf_security_token, dbuser, dbpwd, dbhost, dbport, dbname
 
-#generate api key
+#Generate api key for pardot 
 url = 'https://pi.pardot.com/api/login/version/3'
 api_key =  requests.post(url, data={'email':email,
                         'password':password,
@@ -24,11 +24,13 @@ api_key =  requests.post(url, data={'email':email,
 
 auth = "Pardot api_key={}, user_key={}".format(api_key,API_User_Key)
 
-# Query Prospects
+#Query Pardot 'Prospects'
+
+#Pardot only allows retrieval of 200 records at a time. To retrieve all the records, the offset parameter is increased by 200 each time
+
 i=0
 prospects = pd.DataFrame()
 
-# fields = "id,created_at,Persona,campaign"
 prospect_url = "https://pi.pardot.com/api/prospect/version/3/do/query?output=bulk&format=json&sort_by=&src=&offset="+str(i)
 
 while requests.get(prospect_url, headers={"Authorization": auth}).json()['result'] is not None:
@@ -42,13 +44,13 @@ while requests.get(prospect_url, headers={"Authorization": auth}).json()['result
     
     i=i+200
 
-#create a df with personas and list ids
+#Create a dataframe with personas and list ids
 Persona = ["Dan","Claire","Lynn","Rey","Maya"]
 ID = [104733,104731,104727,104749,104719]
 List_Ids = pd.DataFrame(list(zip(Persona, ID)), 
             columns =['Persona', 'Id'])
 
-#query list memberships
+#Query Pardto 'List Memberships' to get all people with in each persona customer segment
 list_memberships = pd.DataFrame()
 
 for index, row in List_Ids.iterrows():
@@ -72,60 +74,67 @@ for index, row in List_Ids.iterrows():
 
         i=i+200
 
-#index list name
+#Merge list names (personas)
 list_memberships = pd.merge(list_memberships,List_Ids,left_on='list_id',right_on='Id')
 
-#index campaign
+#Merge prospect fields (e.g., campaign)
 prospects = prospects[['id','created_at','campaign','is_do_not_email','opted_out','crm_contact_fid','crm_lead_fid']]
 list_memberships = pd.merge(list_memberships,prospects,left_on='prospect_id',right_on='id')
 
+#Recode NaNs to 0
 list_memberships['is_do_not_email'] = list_memberships['is_do_not_email'].replace(np.nan, 0)
 
-#rename created dates
+#Rename dates colums
 list_memberships.rename(columns = {'created_at_x':'join_date','created_at_y':'created_date','opted_out_x':'opted_out'}, inplace = True)
 
+#Keep certain columns
 list_memberships = list_memberships[['prospect_id','created_date','opted_out','campaign','is_do_not_email','Persona','join_date','crm_contact_fid','crm_lead_fid']]
 
+#Recode values
 list_memberships['opted_out'] = list_memberships['opted_out'].replace({False: 0,True:1})
 
-#traverse through memberships and extract campaign name (third set of quotes)
+#Traverse through prospects and extract the campaign name (third set of quotes)
 campaigns =[]
 
 for index, row in list_memberships.iterrows():
     campaigns.append(re.findall("'([^']*)'", str(row['campaign']))[2])
 list_memberships['campaign'] = campaigns
 
+#Remove unmailable prospects
 list_memberships = list_memberships[list_memberships['is_do_not_email']==0]
 
+#Subset dataframe and rename column
 prospects = list_memberships[['prospect_id','created_date','opted_out','campaign','is_do_not_email','Persona','join_date']]
 prospects.rename(columns = {'Persona':'persona'},inplace=True)
 
-##QUery Salesforce
+#Query Salesforce 'Engagements' object
 sf = Salesforce(username=sf_username, password=sf_password, security_token=sf_security_token)
 Engagements = pd.DataFrame(sf.query_all("SELECT Contact_18_Digit_Id__c,Date_of_Interaction__c,Type_Detail__c,Marketing_Interaction_Type__c,Lead_18_Digit_Id__c FROM Engagements__c WHERE Date_of_Interaction__c>2016-12-31")['records'])
 
-#remove attributes
+#Remove attributes column
 del Engagements['attributes']
-#rename columns
+#Rename columns
 Engagements.rename(columns = {'Contact_18_Digit_Id__c':'Contact',
                             'Lead_18_Digit_Id__c':'Lead',
                             'Date_of_Interaction__c':'Date',
                             'Type_Detail__c':'Engagement',
                             'Marketing_Interaction_Type__c':'Engagement_Type'}, inplace = True)
-#reorder columns
+#Reorder columns
 Engagements = Engagements[['Contact', 'Lead', 'Date', 'Engagement', 'Engagement_Type']]
 
-#change 'None' values to np.nan
+#Change 'None' values to np.nan
 cols = ["Contact","Lead"]
 Engagements[cols] = Engagements[cols].replace({'None':np.nan,None:np.nan})
 
-#Working Groups
+#Query 'Working Groups' (other form of engagement stored in seperate Salesforce object)
 WGMembers = pd.DataFrame(sf.query_all("SELECT Contact__c,Higher_Logic_Group__c FROM Higher_Logic_Group_Member__c WHERE Status__c='Active' AND Account_18_Digit_ID__c!='001o000000ivYo7AAE'")['records'])
 del WGMembers['attributes']
 
+#Retrieve group names from different Salesforce object
 WorkingGroups = pd.DataFrame(sf.query_all("SELECT Higher_Logic_Group_18_Digit_ID__c,Name FROM Higher_Logic_Group__c")['records'])
 del WorkingGroups['attributes']
 
+#Associate group members with group name 
 WGMembers = WGMembers.merge(WorkingGroups, left_on='Higher_Logic_Group__c',right_on='Higher_Logic_Group_18_Digit_ID__c')
 
 del WGMembers['Higher_Logic_Group__c']
@@ -141,19 +150,20 @@ WGMembers["Engagement_Type"] = "Working Group"
 
 WGMembers = WGMembers[['Contact', 'Lead', 'Date', 'Engagement', 'Engagement_Type']]
 
-#combine WG with engagements
+#Combine WG with engagements
 Engagements = pd.concat([Engagements,WGMembers])
 
-#SETS Events
+#Retrieve SETS events participants (other form of engagement)
 SETSParticipants = pd.DataFrame(sf.query_all("SELECT Contact__c,Lead__c,SETS_Event__c FROM Event_Participant__c")['records'])
 del SETSParticipants['attributes']
 SETSParticipants.rename(columns = {'Contact__c':'Contact',
                             'Lead__c':'Lead'}, inplace = True)
 
+#Remove events participants not tied to a Salesforce contact or lead
 cols = ["Contact","Lead"]
 SETSParticipants[cols] = SETSParticipants[cols].replace({None:np.nan,'None':np.nan})
 
-#query events for name and date
+#Retrieve names and dates for events
 SETSEvents = pd.DataFrame(sf.query_all("SELECT SETS_Event_18_Digit_ID__c,Name,Start_Event_Date__c FROM SETS_Event__c")['records'])
 del SETSEvents['attributes']
 SETSEvents.rename(columns = {'Start_Event_Date__c':'Date','Name':'Engagement'}, inplace = True)
@@ -165,13 +175,13 @@ del SETSParticipants['SETS_Event_18_Digit_ID__c']
 SETSParticipants["Engagement_Type"] = "Event"
 SETSParticipants = SETSParticipants[['Contact','Lead','Date','Engagement','Engagement_Type']]
 
-#remove bs events
+#Remove test events
 SETSParticipants = SETSParticipants[SETSParticipants["Engagement"] != 'Test Conference (Test0120) - January 2020']
 
-#combine WG with engagements
+#Combine with engagements
 Engagements = pd.concat([Engagements,SETSParticipants])
 
-#change engagement type values
+#Change engagement type values
 Engagements["Engagement_Type"].unique()
 Engagements["Engagement_Type"] =Engagements["Engagement_Type"].replace({'Downloaded OnDemand Webinar':'Event',
                                                                         'Downloaded Publication':'Publication',
@@ -179,11 +189,11 @@ Engagements["Engagement_Type"] =Engagements["Engagement_Type"].replace({'Downloa
 
 list_memberships[["crm_contact_fid","crm_contact_fid"]] = list_memberships[["crm_contact_fid","crm_contact_fid"]].replace({None:np.nan,'None':np.nan})
 
-#If contact is blank replace with lead
+#If contact is blank replace with lead (create a single column of ids)
 list_memberships.crm_contact_fid.fillna(list_memberships.crm_lead_fid, inplace=True)
 Engagements.Contact.fillna(Engagements.Lead, inplace=True)
 
-#delete lead and rename contact to sf_id
+#Delete lead and rename contact to sf_id
 del list_memberships['crm_lead_fid']
 del Engagements['Lead']
 list_memberships.rename(columns = {'crm_contact_fid':'sf_id'}, inplace = True)
@@ -192,48 +202,55 @@ id_match = list_memberships[['sf_id','prospect_id','Persona']]
 Engagements = Engagements.merge(id_match, on='sf_id')
 Engagements = Engagements[Engagements['prospect_id'].notna()]
 del Engagements['sf_id']
-#final cleanup
+
+#Final name changes
 Engagements.rename(columns = {'Date':'engagement_date','Engagement':'engagement','Engagement_Type':'engagement_type','Persona':'persona'}, inplace = True)
 
 #SQL DB CONNECTION
 engine = create_engine(f"postgresql://{dbuser}:{dbpwd}@{dbhost}:{dbport}/{dbname}")
 conn = engine.connect()
 
-#Synthesize
-#Population
+###Transform data so it is in a format that is ready to plot in js
+
+##Population
+#Calcualte the number of prospects is each persona
 population = prospects.groupby(['persona']).size().reset_index()
 population.rename(columns={0:'count'},inplace=True)
 population.to_sql(name='population', if_exists='replace', con=conn, method='multi', chunksize=500, index=False)
 
-#Pop Growth
+##Pop Growth
 pop_growth = prospects
 pop_growth['count']=1
+#Remove prospects created before before 2017
 pop_growth.set_index("created_date", inplace = True)
 pop_growth.index = pd.to_datetime(pop_growth.index)
-#remove dates before 2017
 pop_growth = pop_growth.loc['2017-01-01':datetime.today().strftime('%Y-%m-%d')]
+#Count the number of prospects created for each persona by quarter
 pop_growth = pd.DataFrame(pop_growth.groupby([pd.Grouper(freq='Q'), 'persona'])['count'].count().reset_index())
-#transpose data frame so engagements have own column
+#Transpose data frame
 pop_growth = pop_growth.pivot(index='persona', columns='created_date', values='count').reset_index()
-#remove last column (data is not complete yet)
+#Remove last column (quarter is not complete yet)
 pop_growth.drop(pop_growth.columns[len(pop_growth.columns)-1], axis=1, inplace=True)
 pop_growth.columns = pop_growth.columns.astype(str)
 pop_growth.to_sql(name='pop_growth', if_exists='replace', con=conn, method='multi', chunksize=500, index=False)
 
-#Avg Engage
+#Avg Engage 
 avg_engage = Engagements
+#Count number of engagements per prospect
 avg_engage = avg_engage.groupby(['prospect_id','persona'])['engagement'].count().reset_index()
+#Assign prsopects with no engagements a 0
 no_engage = prospects[~prospects['prospect_id'].isin(Engagements['prospect_id'])]
 no_engage['engagement'] = 0
 no_engage = no_engage[['prospect_id','persona','engagement']]
 avg_engage  = pd.concat([avg_engage,no_engage])
-# calculate mean engagements
+#Calculate mean engagements by persona
 avg_engage = avg_engage.groupby(['persona'])['engagement'].mean().reset_index()
 avg_engage.to_sql(name='avg_engage', if_exists='replace', con=conn, method='multi', chunksize=500, index=False)
 
 #Engage Type
+#Count the number of engagements persona groups have by category (e.g., event, working group)
 engage_type = Engagements.groupby(['persona','engagement_type']).size().reset_index()
-#transpose data frame so engagements have own column
+#Transpose data frame so engagements have own column
 engage_type = engage_type.pivot(index='persona', columns='engagement_type', values=0).reset_index()
 cols = ['Event', 'Publication', 'Working Group']
 engage_type[cols] = engage_type[cols].div(engage_type[cols].sum(axis=1), axis=0).multiply(100)
@@ -241,14 +258,15 @@ engage_type.rename(columns={'Working Group':'WorkingGroup'}, inplace = True)
 engage_type.to_sql(name='engage_type', if_exists='replace', con=conn, method='multi', chunksize=500, index=False)
 
 #Top Items
-# remove nones
+#Remove nones
 top_items = Engagements[Engagements['engagement'].notnull()]
 top_items['engagement_date'] = pd.to_datetime(top_items['engagement_date'])
 top_items.set_index('engagement_date', inplace=True)
-# remove engagements past 6 months ago
+#Remove engagements past 6 months ago
 six_ago = (datetime.today() - timedelta(6*365/12))
 top_items = top_items.loc[str(six_ago):str(datetime.today())]
 top_items['count'] =1
+#Sum the number of engagements with each item (e.g., utility conference, ev report)
 item_count = top_items.groupby(['persona','engagement'])['count'].sum().reset_index()
 top_items = item_count.groupby(['persona'])['count'].nlargest(5).reset_index()
 top_items = top_items.merge(item_count, left_on='level_1',right_index=True)
@@ -257,29 +275,32 @@ top_items= top_items.rename(columns={'persona_y':'persona','count_y':'count'})
 top_items.to_sql(name='top_items', if_exists='replace', con=conn, method='multi', chunksize=500, index=False)
 
 #Top Campaigns
-#subset prospects created in the last 6 months
+#Subset prospects created in the last 6 months
 new_prospects = prospects.loc[str(six_ago):str(datetime.today())]
-#aggregate by persona and campaign
+#Aggregate by persona and campaign
 campaigns_count = pd.DataFrame({'count' : new_prospects.groupby([new_prospects['persona'], new_prospects['campaign']]).size()}).reset_index()
 campaigns_count.sort_values(by=['count'], inplace=True, ascending=False)
-#remove outbound sources (spi)
+#Remove outbound sources (spi)
 outbounds = ['Created in Salesforce','SPI2019','Solar Power Northeast']
 campaigns_count = campaigns_count[~campaigns_count['campaign'].isin(outbounds)]
-#get top 5 campaigns per persona
+#Get top 5 campaigns per persona
 top_campaigns = pd.DataFrame({'count' : campaigns_count.groupby(campaigns_count['persona'])['count'].nlargest(5)}).reset_index()
 top_campaigns = top_campaigns.merge(campaigns_count,left_on='level_1',right_on=None,right_index=True)
 top_campaigns = top_campaigns[['persona_x','campaign','count_y']]
 top_campaigns.rename(columns = {'persona_x':'persona','count_y':'count'}, inplace = True)
 top_campaigns.to_sql(name='top_campaigns', if_exists='replace', con=conn, method='multi', chunksize=500, index=False)
 
-#Recfreq
+#Recfreq (status of prospects (e.g., active, lost))
 engagements = Engagements
+#Calculate days since engagements
 engagements['R'] = pd.Timestamp.now().normalize() - pd.to_datetime(engagements['engagement_date'])
 engagements['R'] = engagements['R'].astype(str).apply(lambda x: x.split()[0])
 engagements = engagements[engagements['R'] != "NaT"]
 engagements['R'] = pd.to_numeric(engagements['R'])
 engagements['F']=1
+#Aggregate engagements, taking the sum of engagements and most recent engagement date for each prospect
 recfreq = engagements.groupby(['prospect_id','persona']).agg({'F':'sum','R':'min'}).reset_index()
+#Repeat process for prospects with no engagements
 prospects2 = prospects
 prospects2 = prospects2.reset_index()
 prospects2['R'] = pd.Timestamp.now().normalize() - pd.to_datetime(prospects2['created_date'])
@@ -289,12 +310,12 @@ prospects2['R'] = pd.to_numeric(prospects2['R'])
 prospects2['F']=0
 no_engage = prospects2[~prospects2['prospect_id'].isin(recfreq['prospect_id'])]
 no_engage = no_engage[['prospect_id','persona','F','R']]
-# concat 0 engagements
+#Concatenate 0 engagement prospects
 recfreq = pd.concat([recfreq,no_engage])
-#remove person with 1815 engagements
+#Remove person with 1815 engagements
 recfreq = recfreq[recfreq['F'] != 1814]
+#Categorize prospects based on receny and frequency of engagements
 recfreq['status']=''
-#categorize FR into status
 recfreq.loc[((recfreq['F'] > 1) & (recfreq['R'] <= 180)),'status'] = 'Active'
 recfreq.loc[((recfreq['F'] <= 1) & (recfreq['R'] <= 180)),'status'] = 'New'
 recfreq.loc[((recfreq['R'] > 180) & (recfreq['R'] <= 365)),'status'] = 'Lapsed'

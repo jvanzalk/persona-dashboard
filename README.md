@@ -6,8 +6,6 @@ Leading marketing automation platforms, such as Pardot, do not have built-in vis
 
 This full-stack analytics application leverages the Pardot API as well as Amazon’s RDS and EC2 services, to a company track their personas’ growth and engagement.
 
-https://persona-dashboard.herokuapp.com/
-
 ## Technology Stack
 <img src= "https://github.com/JohnvanZalk/persona-dashboard/blob/master/images/technology_diagram.JPG" width="700">
 

@@ -13,6 +13,11 @@ This full-stack analytics application leverages the Pardot API as well as Amazon
 2. The flask application retrieves data from the SQL database rather than connecting directly to Salesforce and Pardot. This increases performance by allowing plots to render more quickly.
 3. The flask application plus frontend code are hosted on Heroku.
 
+##
+
+<img src= "https://github.com/JohnvanZalk/persona-dashboard/blob/master/images/dash_1.JPG" width="700">
+<img src= "https://github.com/JohnvanZalk/persona-dashboard/blob/master/images/dash_2.JPG" width="700">
+
 ## Future Development
 Right now, this application is built for a single organization, but my goal is to scale it so that any company can connect to their Pardot environment and get insights.
 

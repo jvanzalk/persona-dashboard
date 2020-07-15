@@ -1,11 +1,13 @@
-
+//Import population data
 function myFunc() {
     return popData
 }
+//Log to make sure data is read in properly
 console.log(popData);
-
+//Sort population data from largest to smallest
 var sortedpops = popData.sort((b, a) => b.count - a.count);
 
+//Store data being plotted and style to 'data'
 var data = [
     {
         y: ["Maya ","Rey ","Lynn ","Claire ","Dan "],  
@@ -20,8 +22,9 @@ var data = [
             }
         }
     }
-];               
+];
 
+//Store layout
 var layout = {
     title: "Population",
     xaxis: { title: "Individuals"},
@@ -35,11 +38,10 @@ var layout = {
 // Plot the chart to a div tag with id "plot"
 Plotly.newPlot("plot", data, layout);
 
+//Avg engagements
 function myFunc() {
     return avg_engage
 }
-
-console.log(avg_engage);
 
 var data2 = [
     {
@@ -64,19 +66,14 @@ var data2 = [
       showticklabels: false
     }
   };
-    
-  // Plot the chart to a div tag with id "plot"
+ 
   Plotly.newPlot("plot2", data2, layout)
 
-
-
-/////ENGAGEMENT TYPE PLOT/////
+//Engagement type breakdown
 
 function myFunc() {
     return engage_type
 }
-
-console.log(engage_type);
 
 var event = {
     y: [engage_type[3].persona, engage_type[4].persona, engage_type[2].persona, engage_type[0].persona, engage_type[1].persona],
@@ -136,13 +133,13 @@ var event = {
   
   Plotly.newPlot('plot3', data3, layout);
 
-/////POP GROWTH PLOT/////
 
-
+//val() function executed on select and load
+//Gets dropdown value, determines index of that value (sel), and renders plots/tables
 function val() {  
 
     d = document.getElementById("Persona").value;
-
+    //Get index of persona
     sel = 0
 
     if (d == 'Claire') {
@@ -157,7 +154,7 @@ function val() {
     sel = 4;
     };
 
-
+    //Population growth
     function myFunc() {
         return pop_growth
     };
@@ -178,7 +175,7 @@ function val() {
 
     Plotly.newPlot('plot4', data4, layout);
 
-    ///// RF PLOT /////
+    //Engagement status
 
     function myFunc() {
         return recfreq
@@ -204,7 +201,7 @@ function val() {
     
     Plotly.newPlot('plot5', data, layout);
 
-    ///// TOP ITEMS TABLE /////
+    //Top items table
 
     function myFunc() {
         return top_items
@@ -240,7 +237,7 @@ function val() {
         newCell.appendChild(newText);
     };
 
-    ///// TOP CAMPAIGNS TABLE /////
+    //Top campaigns table
 
     function myFunc() {
         return top_campaigns

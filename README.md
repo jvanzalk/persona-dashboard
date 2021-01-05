@@ -17,7 +17,3 @@ This full-stack analytics application leverages the Pardot API as well as Amazon
 
 <img src= "https://github.com/JohnvanZalk/persona-dashboard/blob/master/images/dash_1.JPG" width="700">
 <img src= "https://github.com/JohnvanZalk/persona-dashboard/blob/master/images/dash_2.JPG" width="700">
-
-## Future Development
-Right now, this application is built for a single organization, but my goal is to scale it so that any company can connect to their Pardot environment and get insights.
-

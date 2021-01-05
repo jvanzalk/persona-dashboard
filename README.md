@@ -4,7 +4,7 @@ Personas are fictional characters that represent a segment of a company's custom
 
 Leading marketing automation platforms, such as Pardot, do not have built-in visualizations to monitor the health of personas or any customer segments.
 
-This full-stack analytics application leverages the Pardot API as well as Amazon’s RDS and EC2 services, to a company track their personas’ growth and engagement.
+This dashboard leverages the Pardot and Salesforce API as well as Amazon’s RDS and EC2 services, to track persona growth and engagement.
 
 ## Technology Stack
 <img src= "https://github.com/JohnvanZalk/persona-dashboard/blob/master/images/technology_diagram.JPG" width="700">
